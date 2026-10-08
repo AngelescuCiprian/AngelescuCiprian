@@ -1,0 +1,27 @@
+{
+  "date": "2026-10-08",
+  "repos": 53,
+  "private": 15,
+  "contributions": 333,
+  "private_contributions": 286,
+  "commits": 155,
+  "languages": {
+    "HTML": 6265847,
+    "TypeScript": 1383868,
+    "Python": 913227,
+    "JavaScript": 384987,
+    "C#": 94970,
+    "Astro": 70553,
+    "Shell": 59561,
+    "CSS": 55014,
+    "C++": 52953,
+    "Jupyter Notebook": 48248,
+    "Assembly": 28744,
+    "PLpgSQL": 20201,
+    "PHP": 18466,
+    "NetLogo": 14709,
+    "C": 8367,
+    "Batchfile": 6835,
+    "PowerShell": 1952
+  }
+}
