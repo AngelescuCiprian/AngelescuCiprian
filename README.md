@@ -4,7 +4,7 @@
 
 I build automations that people can trust with real data. At **CityGrill** I work on AI and BI automation: tools that change thousands of POS records only after a person approves the plan, assistants that answer questions straight from Power BI, and reports that run themselves. Through my own B2B company I build websites and web apps for clients, and I'm a student at the Faculty of Cybernetics, Statistics and Economic Informatics at ASE Bucharest.
 
-I'm not tied to one stack. I pick up what the project needs: TypeScript and Python most days, DAX and SQL for data, C, C++ and Assembly from university.
+I'm not tied to one stack. I pick up what the project needs: TypeScript and Python most days, DAX and SQL for data, C, C++, Java, C# and Assembly from university.
 
 <p align="center">
   <a href="https://getaiatlas.com/u/AngelescuCiprian"><img src="https://getaiatlas.com/api/badge/AngelescuCiprian" width="49%" alt="AI-Atlas profile for @AngelescuCiprian"></a>
