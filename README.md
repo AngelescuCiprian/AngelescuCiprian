@@ -65,4 +65,4 @@ Also: a landing page for [a beauty salon](https://github.com/AngelescuCiprian/Mo
   <a href="https://angelescu-ciprian.netlify.app/"><b>Portfolio</b></a> · Bucharest, Romania
 </p>
 
-<p align="center"><sub>Stats read from the GitHub API, private repositories included. Rebuild with <code>python scripts/build_assets.py --refresh</code>.</sub></p>
+<p align="center"><sub>Stats are read from the GitHub API every day, private repositories included.</sub></p>

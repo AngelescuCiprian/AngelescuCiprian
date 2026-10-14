@@ -3,6 +3,9 @@
     python scripts/build_assets.py            # rebuild SVGs from scripts/stats.json
     python scripts/build_assets.py --refresh  # re-read stats from the GitHub API first (needs `gh` logged in)
 
+The "Refresh stats" workflow runs the second form every day with a read-only token
+(secret STATS_TOKEN) that can see the private repositories.
+
 Fonts (OFL) are downloaded once into scripts/.fonts, subset to the glyphs each SVG
 uses and embedded as WOFF2, so every visitor sees the same type.
 """
@@ -45,13 +48,15 @@ LANG_COLORS = ["#3987E5", "#199E70", "#9085E9", "#D55181"]
 OTHER_COLOR = "#4A5764"
 EXCLUDED_LANGS = {"HTML", "CSS", "Jupyter Notebook"}  # generated dashboards would swamp the bar
 
+# Pinned to one google/fonts commit so the embedded fonts never change under us.
+_GF = "https://github.com/google/fonts/raw/e9678a5385322c63730122ba464765baad83cfd8/ofl"
 FONT_SOURCES = {
     "serif": ("InstrumentSerif-Regular.ttf",
-              "https://github.com/google/fonts/raw/main/ofl/instrumentserif/InstrumentSerif-Regular.ttf"),
+              f"{_GF}/instrumentserif/InstrumentSerif-Regular.ttf"),
     "serif-italic": ("InstrumentSerif-Italic.ttf",
-                     "https://github.com/google/fonts/raw/main/ofl/instrumentserif/InstrumentSerif-Italic.ttf"),
+                     f"{_GF}/instrumentserif/InstrumentSerif-Italic.ttf"),
     "mono-var": ("JetBrainsMono.ttf",
-                 "https://github.com/google/fonts/raw/main/ofl/jetbrainsmono/JetBrainsMono%5Bwght%5D.ttf"),
+                 f"{_GF}/jetbrainsmono/JetBrainsMono%5Bwght%5D.ttf"),
 }
 MONO_ADVANCE = 0.6  # JetBrains Mono advance width, in em
 
@@ -74,6 +79,8 @@ def _load_fonts() -> dict[str, TTFont]:
     var = _download("mono-var")
     fonts["mono"] = instancer.instantiateVariableFont(TTFont(var), {"wght": 400})
     fonts["mono-bold"] = instancer.instantiateVariableFont(TTFont(var), {"wght": 700})
+    for f in fonts.values():
+        f.recalcTimestamp = False  # otherwise every build embeds a new timestamp and the SVGs churn
     return fonts
 
 
@@ -105,7 +112,7 @@ def font_face(font: str, chars: set[str]) -> str:
     buf = io.BytesIO()
     f.save(buf)
     buf.seek(0)
-    clone = TTFont(buf)
+    clone = TTFont(buf, recalcTimestamp=False)
     sub.subset(clone)
     out = io.BytesIO()
     clone.flavor = "woff2"
@@ -250,8 +257,15 @@ def build_header() -> None:
 
 
 # ── stats ────────────────────────────────────────────────────────────────────
-def gh(*args: str, check: bool = True) -> str:
-    return subprocess.run(["gh", *args], capture_output=True, text=True, check=check).stdout
+def gh(*args: str, ok_status: str | None = None) -> str:
+    """Run gh and return stdout. A failure is fatal unless its stderr names `ok_status`,
+    in which case the answer is empty."""
+    run = subprocess.run(["gh", *args], capture_output=True, text=True)
+    if not run.returncode:
+        return run.stdout
+    if ok_status and f"HTTP {ok_status}" in run.stderr:
+        return ""
+    raise SystemExit(f"gh {' '.join(args)} failed: {run.stderr.strip()}")
 
 
 def refresh_stats() -> dict:
@@ -262,11 +276,13 @@ def refresh_stats() -> dict:
         langs.update(json.loads(gh("api", f"repos/{USER}/{r['name']}/languages")))
         # an empty repository answers 409, which simply means zero commits
         out = gh("api", f"repos/{USER}/{r['name']}/commits?per_page=100&author={USER}",
-                 "--paginate", "--jq", "length", check=False)
+                 "--paginate", "--jq", "length", ok_status="409")
         commits += sum(int(n) for n in out.split() if n.isdigit())
-    cal = json.loads(gh("api", "graphql", "-f", "query=query{viewer{contributionsCollection{"
+    # Private contributions come back as "restricted" for every viewer, the owner included,
+    # so this split does not depend on which token reads it.
+    cal = json.loads(gh("api", "graphql", "-f", f'query=query{{user(login:"{USER}"){{contributionsCollection{{'
                         "restrictedContributionsCount contributionCalendar{totalContributions}}}}"))
-    cc = cal["data"]["viewer"]["contributionsCollection"]
+    cc = cal["data"]["user"]["contributionsCollection"]
     stats = {
         "date": date.today().isoformat(),
         "repos": len(repos),
@@ -276,6 +292,13 @@ def refresh_stats() -> dict:
         "commits": commits,
         "languages": dict(langs.most_common()),
     }
+    # A token that cannot see private repositories would publish public-only numbers.
+    if not stats["private"]:
+        raise SystemExit("no private repositories visible: the token lacks access, nothing written")
+    old = json.loads(STATS_FILE.read_text("utf-8")) if STATS_FILE.exists() else {}
+    if {**old, "date": stats["date"]} == stats:
+        print("stats unchanged since", old["date"])
+        return old  # keep the old date so the card stays byte-identical and nothing is committed
     STATS_FILE.write_text(json.dumps(stats, indent=2), encoding="utf-8")
     return stats
 

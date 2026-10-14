@@ -1,0 +1,50 @@
+name: Refresh stats
+
+on:
+  schedule:
+    - cron: "17 4 * * *"  # every day at 04:17 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: refresh-stats
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: scripts/requirements.txt
+
+      - run: pip install -r scripts/requirements.txt
+
+      - name: Read stats from the GitHub API and rebuild the card
+        env:
+          # Read-only fine-grained token: all repositories, Contents read.
+          # GITHUB_TOKEN only sees this repository, so it cannot count the private ones.
+          GH_TOKEN: ${{ secrets.STATS_TOKEN }}
+        run: |
+          if [ -z "$GH_TOKEN" ]; then
+            echo "::error::Secret STATS_TOKEN is missing. Add a read-only token that can see the private repositories."
+            exit 1
+          fi
+          python scripts/build_assets.py --refresh
+
+      - name: Commit when the numbers changed
+        run: |
+          git add assets/stats.svg scripts/stats.json
+          if git diff --cached --quiet; then
+            echo "Numbers unchanged, nothing to commit."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898283+github-actions[bot]@users.noreply.github.com"
+          git commit -m "Refresh profile stats"
+          git push
